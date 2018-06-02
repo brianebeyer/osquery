@@ -1,0 +1,55 @@
+require File.expand_path("../Abstract/abstract-osquery-formula", __FILE__)
+
+class Libyaml < AbstractOsqueryFormula
+  desc "C++ YAML parser and emitter for YAML 1.2 spec"
+  homepage "https://github.com/jbeder/yaml-cpp"
+  url "https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-0.6.2.tar.gz"
+  sha256 "e4d8560e163c3d875fd5d9e5542b5fd5bec810febdcba61481fe5fc4e6b1fd05"
+  license "MIT"
+  head "https://github.com/jbeder/yaml-cpp.git"
+  revision 200 # TODO: everyone else is doing 200
+
+  bottle do
+    root_url "https://osquery-packages.s3.amazonaws.com/bottles" # TODO: should this be this?
+    cellar :any_skip_relocation
+    sha256 "5e1d0907d3cb39861ff36476f8cabb78d9bdf4a9b228cd860502b03b280c226d" => :high_sierra
+    sha256 "d081b409a0e7c60fc5c4d2c965b63fc0f0c7f3b1e36f61274719982ac5799b09" => :sierra
+    sha256 "5ad764dbd25373bc0bd68b213c611650694fe69f36c90fcd746aa90bc876e8f3" => :el_capitan
+  end
+
+  patch :DATA
+
+  option "with-static-lib", "Build a static library"
+
+  depends_on "cmake" => :build
+
+  needs :cxx11
+
+  def install
+    # TODO BB: We need BUILD_SHARED_LIBS=OFF - not sure if this is the right way to force it
+    # args = std_cmake_args + ["-DBUILD_SHARED_LIBS=OFF"]
+
+    args = std_cmake_args
+    if build.with? "static-lib"
+      args << "-DBUILD_SHARED_LIBS=OFF"
+    else
+      args << "-DBUILD_SHARED_LIBS=ON"
+    end
+
+    system "cmake", ".", *args
+    system "make", "install"
+  end
+
+  test do
+    (testpath/"test.cpp").write <<~EOS
+      #include <yaml-cpp/yaml.h>
+      int main() {
+        YAML::Node node  = YAML::Load("[0, 0, 0]");
+        node[0] = 1;
+        return 0;
+      }
+    EOS
+    system ENV.cxx, "test.cpp", "-std=c++11", "-L#{lib}", "-lyaml-cpp", "-o", "test"
+    system "./test"
+  end
+end

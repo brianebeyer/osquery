@@ -125,6 +125,7 @@ function platform_darwin_main() {
   brew_dependency osquery/osquery-local/zstd
 
   # List of LLVM-compiled dependencies.
+  brew_dependency osquery/osquery-local/libyaml
   brew_dependency osquery/osquery-local/libmagic
   brew_dependency osquery/osquery-local/pcre
   brew_dependency osquery/osquery-local/boost

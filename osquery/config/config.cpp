@@ -15,6 +15,7 @@
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/trim.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 
 #include <osquery/config.h>
@@ -25,6 +26,8 @@
 #include <osquery/packs.h>
 #include <osquery/registry.h>
 #include <osquery/tables.h>
+
+#include "yaml-cpp/yaml.h"
 
 #include "osquery/core/conversions.h"
 
@@ -546,6 +549,13 @@ Status Config::updateSource(const std::string& source,
   auto doc = JSON::newObject();
   auto clone = json;
   stripConfigComments(clone);
+
+  if (boost::starts_with(json, "---")) {
+    LOG(WARNING) << "Config file is YAML";
+    YAML::Node yamlNode; // = YAML::Load(json);
+    LOG(WARNING) << "DOC: " << yamlNode["views"].as<std::string>();
+
+  }
 
   if (!doc.fromString(clone) || !doc.doc().IsObject()) {
     return Status(1, "Error parsing the config JSON");
