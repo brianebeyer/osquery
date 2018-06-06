@@ -129,7 +129,7 @@ TEST_F(ConfigTests, test_plugin) {
 }
 
 TEST_F(ConfigTests, test_invalid_content) {
-  std::string bad_json = "{\"options\": {},}";
+  std::string bad_json = "{options : so_much_fail!,}";
   ASSERT_NO_THROW(get().update({{"bad_source", bad_json}}));
 }
 
@@ -245,6 +245,30 @@ TEST_F(ConfigTests, test_content_update) {
   // Read config content manually.
   std::string content;
   readFile(kTestDataPath + "test_parse_items.conf", content);
+
+  // Create the output of a `genConfig`.
+  std::map<std::string, std::string> config_data;
+  config_data["awesome"] = content;
+
+  // Update, then clear, packs should have been cleared.
+  get().update(config_data);
+  size_t count = 0;
+  auto packCounter = [&count](const Pack& pack) { count++; };
+  get().packs(packCounter);
+  EXPECT_GT(count, 0U);
+
+  // Now clear.
+  config_data["awesome"] = "";
+  get().update(config_data);
+  count = 0;
+  get().packs(packCounter);
+  EXPECT_EQ(count, 0U);
+}
+
+TEST_F(ConfigTests, test_content_update_yaml) {
+  // Read config content manually.
+  std::string content;
+  readFile(kTestDataPath + "test_parse_items.conf.yaml", content);
 
   // Create the output of a `genConfig`.
   std::map<std::string, std::string> config_data;
@@ -390,8 +414,93 @@ TEST_F(ConfigTests, test_get_parser) {
   const auto& doc = parser->getData();
 
   EXPECT_TRUE(doc.doc().HasMember("list"));
+  EXPECT_TRUE(doc.doc()["list"][0] == "a");
+
   EXPECT_TRUE(doc.doc().HasMember("dictionary"));
+  EXPECT_TRUE(doc.doc()["dictionary"]["foo"] == "bar");
+  EXPECT_TRUE(doc.doc()["dictionary"]["foo_int"] == 42);
+  EXPECT_TRUE(doc.doc()["dictionary"]["foo_float"] == 42.5);
+  EXPECT_TRUE(doc.doc()["dictionary"]["foo_bool_true"] == true);
+  EXPECT_TRUE(doc.doc()["dictionary"]["foo_bool_false"] == false);
+
   rf.registry("config_parser")->remove("test");
+}
+
+TEST_F(ConfigTests, test_get_parser_yaml) {
+  auto& rf = RegistryFactory::get();
+  rf.registry("config_parser")
+      ->add("test", std::make_shared<TestConfigParserPlugin>());
+
+  auto s = get().update(getTestConfigMap("test_parse_items.conf.yaml"));
+  EXPECT_TRUE(s.ok());
+  EXPECT_EQ(s.toString(), "OK");
+
+  auto plugin = get().getParser("test");
+  EXPECT_TRUE(plugin != nullptr);
+  EXPECT_TRUE(plugin.get() != nullptr);
+
+  const auto& parser =
+      std::dynamic_pointer_cast<TestConfigParserPlugin>(plugin);
+  const auto& doc = parser->getData();
+
+  EXPECT_TRUE(doc.doc().HasMember("list"));
+  EXPECT_TRUE(doc.doc()["list"][0] == "a_YAML");
+
+  EXPECT_TRUE(doc.doc().HasMember("dictionary"));
+  EXPECT_EQ(doc.doc()["dictionary"]["foo"], "bar_YAML");
+  EXPECT_EQ(doc.doc()["dictionary"]["foo2"], "bar2_YAML");
+
+  EXPECT_EQ(doc.doc()["dictionary"]["foo3"], "bar3_YAML");
+  EXPECT_EQ(doc.doc()["dictionary"]["foo3_2"], "bar3_YAML");
+
+  EXPECT_EQ(doc.doc()["dictionary"]["foo4"]["hi"], "hival");
+  EXPECT_EQ(doc.doc()["dictionary"]["foo4"]["ho"], "hoval");
+  EXPECT_EQ(doc.doc()["dictionary"]["foo4_2"]["hi"], "hival");
+  EXPECT_EQ(doc.doc()["dictionary"]["foo4_2"]["ho"], "hoval");
+
+  // data type tests
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_int"], 142);
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_quoted_int_so_string"], "142");
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_int_hex"], 247);
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_int_octal"], 10);
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_float"], 142.5);
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_quoted_float_so_string"], "142.5");
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_fake_int"], "142asdasd");
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_fake_int2"], "asdasd142");
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_fake_float"], "142.5asdasd");
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_fake_float2"], "asdasd142.5");
+
+  auto trues = doc.doc()["dictionary"]["foo_bool_true"].GetArray();
+  EXPECT_GT(trues.Size(), 0U);
+  for (rapidjson::SizeType i = 0; i < trues.Size(); i++) {
+    std::cerr << "checking foo_bool_true #" << i << std::endl;
+    EXPECT_TRUE(trues[i] == true);
+  }
+
+  auto falses = doc.doc()["dictionary"]["foo_bool_false"].GetArray();
+  EXPECT_GT(falses.Size(), 0U);
+  for (rapidjson::SizeType i = 0; i < falses.Size(); i++) {
+    std::cerr << "checking foo_bool_false #" << i << std::endl;
+    EXPECT_TRUE(falses[i] == false);
+  }
+
+  auto nulls = doc.doc()["dictionary"]["foo_null"].GetArray();
+  EXPECT_GT(nulls.Size(), 0U);
+  //  for (rapidjson::SizeType i = 0; i < nulls.Size(); i++) {
+  //    std::cerr << "checking foo_null #" << i << std::endl;
+  //    EXPECT_TRUE(nulls[i] == nullptr);
+  //  }
+
+  rf.registry("config_parser")->remove("test");
+}
+
+TEST_F(ConfigTests, test_get_parser_yaml_bad_doc) {
+  auto& rf = RegistryFactory::get();
+  rf.registry("config_parser")
+      ->add("test", std::make_shared<TestConfigParserPlugin>());
+
+  ASSERT_NO_THROW(
+      get().update(getTestConfigMap("test_yaml_configs/bad_doc.conf.yaml")));
 }
 
 class PlaceboConfigParserPlugin : public ConfigParserPlugin {

@@ -3,6 +3,8 @@ options:
   host_identifier: hostname
   schedule_splay_percent: 10
 
+test_null:
+
 # we can have comments
 schedule:
   macos_kextstat:

@@ -6,8 +6,6 @@ class YamlCpp < AbstractOsqueryFormula
   url "https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-0.6.2.tar.gz"
   sha256 "e4d8560e163c3d875fd5d9e5542b5fd5bec810febdcba61481fe5fc4e6b1fd05"
   license "MIT"
-  head "https://github.com/jbeder/yaml-cpp.git"
-  revision 200 # TODO: everyone else is doing 200
 
   bottle do
     root_url "https://osquery-packages.s3.amazonaws.com/bottles" # TODO: should this be this?
@@ -17,8 +15,6 @@ class YamlCpp < AbstractOsqueryFormula
     sha256 "5ad764dbd25373bc0bd68b213c611650694fe69f36c90fcd746aa90bc876e8f3" => :el_capitan
   end
 
-  patch :DATA
-
   option "with-static-lib", "Build a static library"
 
   depends_on "cmake" => :build
@@ -27,11 +23,11 @@ class YamlCpp < AbstractOsqueryFormula
 
   def install
     args = std_cmake_args
-    if build.with? "static-lib"
+    # if build.with? "static-lib"
       args << "-DBUILD_SHARED_LIBS=OFF"
-    else
-      args << "-DBUILD_SHARED_LIBS=ON"
-    end
+    # else
+    #   args << "-DBUILD_SHARED_LIBS=ON"
+    # end
 
     system "cmake", ".", *args
     system "make", "install"

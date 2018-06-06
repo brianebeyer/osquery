@@ -528,54 +528,117 @@ void stripConfigComments(std::string& json) {
   json = sink;
 }
 
-void translateYamlNodeToJson(const YAML::Node &node,
-                             rapidjson::Writer<rapidjson::StringBuffer> &convertedJsonWriter) {
+void translateYamlNodeToJson(
+    const YAML::Node& node,
+    rapidjson::Writer<rapidjson::StringBuffer>& convertedJsonWriter) {
   switch (node.Type()) {
-    case YAML::NodeType::Sequence:
-      convertedJsonWriter.StartArray();
-      for (size_t i = 0; i < node.size(); i++) {
-        translateYamlNodeToJson(node[i], convertedJsonWriter);
+  case YAML::NodeType::Sequence:
+    convertedJsonWriter.StartArray();
+    for (size_t i = 0; i < node.size(); i++) {
+      translateYamlNodeToJson(node[i], convertedJsonWriter);
+    }
+    convertedJsonWriter.EndArray();
+    break;
+
+  case YAML::NodeType::Map:
+    convertedJsonWriter.StartObject();
+    for (YAML::const_iterator it = node.begin(); it != node.end(); ++it) {
+      convertedJsonWriter.Key(it->first.as<std::string>().c_str());
+      translateYamlNodeToJson(it->second, convertedJsonWriter);
+    }
+    convertedJsonWriter.EndObject();
+    break;
+
+  case YAML::NodeType::Null:
+  case YAML::NodeType::Undefined:
+    convertedJsonWriter.Null();
+    break;
+
+  case YAML::NodeType::Scalar:
+    auto nodeVal = node.as<std::string>();
+
+    if (nodeVal == "~" || nodeVal == "null" || nodeVal == "Null" ||
+        nodeVal == "NULL") {
+      convertedJsonWriter.Null();
+    } else if (nodeVal == "true" || nodeVal == "True" || nodeVal == "TRUE") {
+      convertedJsonWriter.Bool(true);
+    } else if (nodeVal == "false" || nodeVal == "False" || nodeVal == "FALSE") {
+      convertedJsonWriter.Bool(false);
+    } else {
+      if (node.Tag() != "!") {
+        const char* end = nodeVal.c_str() + nodeVal.length();
+        char* pos = nullptr;
+
+        // hex strings
+        if (boost::starts_with(nodeVal, "0x")) {
+          auto i = strtoll(nodeVal.c_str() + 2, &pos, 16);
+          if (pos == end) {
+            convertedJsonWriter.Int64(i);
+            break;
+          }
+        }
+
+        // octal strings
+        if (boost::starts_with(nodeVal, "0o")) {
+          auto i = strtoll(nodeVal.c_str() + 2, &pos, 8);
+          if (pos == end) {
+            convertedJsonWriter.Int64(i);
+            break;
+          }
+        }
+
+        // try parsing it as a long
+        auto i = strtoll(nodeVal.c_str(), &pos, 10);
+        if (pos == end) {
+          convertedJsonWriter.Int64(i);
+          break;
+        }
+
+        // try parsing it as a double
+        auto d = strtod(nodeVal.c_str(), &pos);
+        if (pos == end) {
+          convertedJsonWriter.Double(d);
+          break;
+        }
       }
-      convertedJsonWriter.EndArray();
-      break;
 
-    case YAML::NodeType::Map:
-      convertedJsonWriter.StartObject();
-      for (YAML::const_iterator it = node.begin(); it != node.end(); ++it) {
-        convertedJsonWriter.Key(it->first.as<std::string>().c_str());
-        translateYamlNodeToJson(it->second, convertedJsonWriter);
-      }
-      convertedJsonWriter.EndObject();
-
-      break;
-
-    case YAML::NodeType::Scalar:
-      // currently write all values out as strings
-      convertedJsonWriter.String(node.as<std::string>().c_str());
-      break;
+      convertedJsonWriter.String(nodeVal.c_str());
+    }
+    break;
   }
 }
 
-void translateToJsonIfYaml(std::string& json) {
-  if (boost::starts_with(json, "---") || )) {
+Status translateToJsonIfYaml(std::string& json) {
+  // TODO: this prevents config files that start with comments from working
+  if (boost::starts_with(json, "---")) {
     LOG(INFO) << "Config file is YAML so converting to JSON";
 
     // load the YAML node
-    YAML::Node yamlNode = YAML::Load(json);
-    LOG(INFO) << "Config YAML was successfully parsed";
+    try {
+      YAML::Node yamlNode = YAML::Load(json);
+      LOG(INFO) << "Config YAML was successfully parsed";
 
-    // begin a new JSON doc
-    rapidjson::StringBuffer convertedToJsonBuffer;
-    rapidjson::Writer<rapidjson::StringBuffer> convertedJsonWriter(convertedToJsonBuffer);
+      // begin a new JSON doc
+      rapidjson::StringBuffer convertedToJsonBuffer;
+      rapidjson::Writer<rapidjson::StringBuffer> convertedJsonWriter(
+          convertedToJsonBuffer);
 
-    // iterate through the YAML node and turn it into JSON
-    LOG(INFO) << "Converting config YAML to JSON";
-    translateYamlNodeToJson(yamlNode, convertedJsonWriter);
+      // iterate through the YAML node and turn it into JSON
+      LOG(INFO) << "Converting config YAML to JSON";
+      translateYamlNodeToJson(yamlNode, convertedJsonWriter);
 
-    // end the object and get the string
-    json = convertedToJsonBuffer.GetString();
+      // end the object and get the string
+      json = convertedToJsonBuffer.GetString();
 
-    LOG(INFO) << "Config YAML successfully converted to JSON: " << json;
+      LOG(INFO) << "Config YAML successfully converted to JSON: " << json;
+      return Status();
+
+    } catch (const YAML::ParserException& e) {
+      LOG(ERROR) << "Failed to parse config YAML " << e.what();
+      return Status(1, "Error parsing the config YAML");
+    }
+  } else {
+    return Status();
   }
 }
 
@@ -599,7 +662,12 @@ Status Config::updateSource(const std::string& source,
   // load the config (source.second) into a JSON object.
   auto doc = JSON::newObject();
   auto clone = json;
-  translateToJsonIfYaml(clone);
+
+  auto yamlStatus = translateToJsonIfYaml(clone);
+  if (yamlStatus.getCode() == 1) {
+    return yamlStatus;
+  }
+
   stripConfigComments(clone);
 
   if (!doc.fromString(clone) || !doc.doc().IsObject()) {
@@ -686,7 +754,10 @@ Status Config::genPack(const std::string& name,
     return Status();
   }
 
-  translateToJsonIfYaml(clone);
+  auto yamlStatus = translateToJsonIfYaml(clone);
+  if (yamlStatus.getCode() == 1) {
+    return yamlStatus;
+  }
   stripConfigComments(clone);
 
   auto doc = JSON::newObject();
