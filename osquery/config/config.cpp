@@ -528,6 +528,57 @@ void stripConfigComments(std::string& json) {
   json = sink;
 }
 
+void translateYamlNodeToJson(const YAML::Node &node,
+                             rapidjson::Writer<rapidjson::StringBuffer> &convertedJsonWriter) {
+  switch (node.Type()) {
+    case YAML::NodeType::Sequence:
+      convertedJsonWriter.StartArray();
+      for (size_t i = 0; i < node.size(); i++) {
+        translateYamlNodeToJson(node[i], convertedJsonWriter);
+      }
+      convertedJsonWriter.EndArray();
+      break;
+
+    case YAML::NodeType::Map:
+      convertedJsonWriter.StartObject();
+      for (YAML::const_iterator it = node.begin(); it != node.end(); ++it) {
+        convertedJsonWriter.Key(it->first.as<std::string>().c_str());
+        translateYamlNodeToJson(it->second, convertedJsonWriter);
+      }
+      convertedJsonWriter.EndObject();
+
+      break;
+
+    case YAML::NodeType::Scalar:
+      // currently write all values out as strings
+      convertedJsonWriter.String(node.as<std::string>().c_str());
+      break;
+  }
+}
+
+void translateToJsonIfYaml(std::string& json) {
+  if (boost::starts_with(json, "---") || )) {
+    LOG(INFO) << "Config file is YAML so converting to JSON";
+
+    // load the YAML node
+    YAML::Node yamlNode = YAML::Load(json);
+    LOG(INFO) << "Config YAML was successfully parsed";
+
+    // begin a new JSON doc
+    rapidjson::StringBuffer convertedToJsonBuffer;
+    rapidjson::Writer<rapidjson::StringBuffer> convertedJsonWriter(convertedToJsonBuffer);
+
+    // iterate through the YAML node and turn it into JSON
+    LOG(INFO) << "Converting config YAML to JSON";
+    translateYamlNodeToJson(yamlNode, convertedJsonWriter);
+
+    // end the object and get the string
+    json = convertedToJsonBuffer.GetString();
+
+    LOG(INFO) << "Config YAML successfully converted to JSON: " << json;
+  }
+}
+
 Status Config::updateSource(const std::string& source,
                             const std::string& json) {
   // Compute a 'synthesized' hash using the content before it is parsed.
@@ -548,14 +599,8 @@ Status Config::updateSource(const std::string& source,
   // load the config (source.second) into a JSON object.
   auto doc = JSON::newObject();
   auto clone = json;
+  translateToJsonIfYaml(clone);
   stripConfigComments(clone);
-
-  if (boost::starts_with(json, "---")) {
-    LOG(WARNING) << "Config file is YAML";
-    YAML::Node yamlNode; // = YAML::Load(json);
-    LOG(WARNING) << "DOC: " << yamlNode["views"].as<std::string>();
-
-  }
 
   if (!doc.fromString(clone) || !doc.doc().IsObject()) {
     return Status(1, "Error parsing the config JSON");
@@ -641,7 +686,9 @@ Status Config::genPack(const std::string& name,
     return Status();
   }
 
+  translateToJsonIfYaml(clone);
   stripConfigComments(clone);
+
   auto doc = JSON::newObject();
   if (!doc.fromString(clone) || !doc.doc().IsObject()) {
     LOG(WARNING) << "Error parsing the \"" << name << "\" pack JSON";

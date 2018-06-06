@@ -1,0 +1,46 @@
+---
+options:
+  host_identifier: hostname
+  schedule_splay_percent: 10
+
+test_null:
+
+# we can have comments
+schedule:
+  macos_kextstat:
+    query: SELECT * FROM kernel_extensions;
+    interval: 10
+
+  foobar_minutely:
+    # name a specific query for reuse
+    query: &foobar_query SELECT foo, bar, pid FROM foobar_table;
+    interval: 60
+
+  foobar_hourly:
+    # use a named query
+    query: *foobar_query
+    interval: 3600
+
+#
+# we can have multiline comments
+#
+views:
+  # this is an example of a long query breaking over multiple lines
+  kernel_hashes: SELECT hash.path AS kernel_binary, version, hash.sha256 AS sha256,
+    hash.sha1 AS sha1, hash.md5 AS md5 FROM (SELECT path || '/Contents/MacOS/' AS
+    directory, name, version FROM kernel_extensions) JOIN hash USING (directory);
+
+  another: |
+    SELECT hash.path AS kernel_binary,
+           version,
+           hash.sha256 AS sha256,
+           hash.sha1 AS sha1,
+           hash.md5 AS md5
+    FROM   (
+      SELECT path || '/Contents/MacOS/' AS directory,
+            name,
+            version
+
+      FROM kernel_extensions
+    )
+    JOIN hash USING (directory);

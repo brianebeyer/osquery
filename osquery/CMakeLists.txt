@@ -158,6 +158,7 @@ elseif(FREEBSD)
 endif()
 
 if(POSIX)
+  ADD_OSQUERY_LINK_CORE("yaml-cpp")
   ADD_OSQUERY_LINK_CORE("boost_system")
   ADD_OSQUERY_LINK_CORE("boost_filesystem")
   ADD_OSQUERY_LINK_CORE("boost_thread")

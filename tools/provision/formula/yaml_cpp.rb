@@ -1,6 +1,6 @@
 require File.expand_path("../Abstract/abstract-osquery-formula", __FILE__)
 
-class Libyaml < AbstractOsqueryFormula
+class YamlCpp < AbstractOsqueryFormula
   desc "C++ YAML parser and emitter for YAML 1.2 spec"
   homepage "https://github.com/jbeder/yaml-cpp"
   url "https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-0.6.2.tar.gz"
@@ -26,9 +26,6 @@ class Libyaml < AbstractOsqueryFormula
   needs :cxx11
 
   def install
-    # TODO BB: We need BUILD_SHARED_LIBS=OFF - not sure if this is the right way to force it
-    # args = std_cmake_args + ["-DBUILD_SHARED_LIBS=OFF"]
-
     args = std_cmake_args
     if build.with? "static-lib"
       args << "-DBUILD_SHARED_LIBS=OFF"
