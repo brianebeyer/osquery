@@ -566,7 +566,7 @@ void translateYamlNodeToJson(
       convertedJsonWriter.Bool(false);
     } else {
       if (node.Tag() != "!") {
-        const char* end = nodeVal.c_str() + nodeVal.length();
+        auto end = nodeVal.c_str() + nodeVal.length();
         char* pos = nullptr;
 
         // hex strings
