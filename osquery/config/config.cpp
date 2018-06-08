@@ -27,7 +27,7 @@
 #include <osquery/registry.h>
 #include <osquery/tables.h>
 
-#include "yaml-cpp/yaml.h"
+#include <yaml-cpp/yaml.h>
 
 #include "osquery/core/conversions.h"
 
