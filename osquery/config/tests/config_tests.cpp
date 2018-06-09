@@ -460,6 +460,7 @@ TEST_F(ConfigTests, test_get_parser_yaml) {
 
   // data type tests
   EXPECT_EQ(doc.doc()["dictionary"]["foo_int"], 142);
+  EXPECT_EQ(doc.doc()["dictionary"]["foo_int_decimal"], 142);
   EXPECT_EQ(doc.doc()["dictionary"]["foo_quoted_int_so_string"], "142");
   EXPECT_EQ(doc.doc()["dictionary"]["foo_int_hex"], 247);
   EXPECT_EQ(doc.doc()["dictionary"]["foo_int_octal"], 10);
@@ -473,23 +474,20 @@ TEST_F(ConfigTests, test_get_parser_yaml) {
   auto trues = doc.doc()["dictionary"]["foo_bool_true"].GetArray();
   EXPECT_GT(trues.Size(), 0U);
   for (rapidjson::SizeType i = 0; i < trues.Size(); i++) {
-    std::cerr << "checking foo_bool_true #" << i << std::endl;
-    EXPECT_TRUE(trues[i] == true);
+    EXPECT_EQ(trues[i], true);
   }
 
   auto falses = doc.doc()["dictionary"]["foo_bool_false"].GetArray();
   EXPECT_GT(falses.Size(), 0U);
   for (rapidjson::SizeType i = 0; i < falses.Size(); i++) {
-    std::cerr << "checking foo_bool_false #" << i << std::endl;
-    EXPECT_TRUE(falses[i] == false);
+    EXPECT_EQ(falses[i], false);
   }
 
   auto nulls = doc.doc()["dictionary"]["foo_null"].GetArray();
   EXPECT_GT(nulls.Size(), 0U);
-  //  for (rapidjson::SizeType i = 0; i < nulls.Size(); i++) {
-  //    std::cerr << "checking foo_null #" << i << std::endl;
-  //    EXPECT_TRUE(nulls[i] == nullptr);
-  //  }
+  for (rapidjson::SizeType i = 0; i < nulls.Size(); i++) {
+    EXPECT_TRUE(nulls[i].IsNull());
+  }
 
   rf.registry("config_parser")->remove("test");
 }

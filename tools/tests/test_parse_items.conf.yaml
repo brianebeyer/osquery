@@ -17,6 +17,7 @@ dictionary:
   foo4_2: *foo4
 
   foo_int: 142
+  foo_int_decimal: +142
   foo_quoted_int_so_string: "142"
   foo_int_hex: 0xf7
   foo_int_octal: 0o12
