@@ -94,6 +94,8 @@ Invoke-BatchFile "$env:VS140COMNTOOLS\..\..\vc\vcvarsall.bat" $platform
 $cmake = (Get-Command 'cmake').Source
 $cmakeArgs = @(
   "-G `"$cmakeBuildType`"",
+  '-DBUILD_SHARED_LIBS=OFF',
+  '-DMSVC_SHARED_RT=OFF',
   '../'
 )
 Start-OsqueryProcess $cmake $cmakeArgs
