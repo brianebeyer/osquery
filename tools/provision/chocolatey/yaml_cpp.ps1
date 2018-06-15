@@ -63,12 +63,58 @@ if (-not (Test-Path $sourceDir)) {
 # Hacky-hack-hack - the zip package is annoyingly structured.
 $badPath = Join-Path $sourceDir "$packageName-$packageName-$version"
 $badPath = Join-Path $badPath "*"
-Write-Host "Bad path: $badPath"
 $goodPath = "$sourceDir\"
-Write-Host "Good path: $goodPath"
 Move-Item $badPath $goodPath
-
 Set-Location $sourceDir
+
+# Build the libraries
+$buildDir = New-Item -Force -ItemType Directory -Path 'osquery-win-build'
+Set-Location $buildDir
+
+# Generate the .sln
+$envArch = [System.Environment]::GetEnvironmentVariable('OSQ32')
+$arch = ''
+$platform = ''
+$cmakeBuildType = ''
+if ($envArch -eq 1) {
+  Write-Host '[*] Building 32 bit yaml-cpp libs' -ForegroundColor Cyan
+  $arch = 'Win32'
+  $platform = 'x86'
+  $cmakeBuildType = 'Visual Studio 14 2015'
+} else {
+  Write-Host '[*] Building 64 bit yaml-cpp libs' -ForegroundColor Cyan
+  $arch = 'x64'
+  $platform = 'amd64'
+  $cmakeBuildType = 'Visual Studio 14 2015 Win64'
+}
+
+# Invoke the MSVC developer tools/env
+Invoke-BatchFile "$env:VS140COMNTOOLS\..\..\vc\vcvarsall.bat" $platform
+
+$cmake = (Get-Command 'cmake').Source
+$cmakeArgs = @(
+  "-G `"$cmakeBuildType`"",
+  '../'
+)
+Start-OsqueryProcess $cmake $cmakeArgs
+
+# Build the libraries
+$msbuild = (Get-Command 'msbuild').Source
+$configurations = @(
+  'Release',
+  'Debug'
+)
+foreach($cfg in $configurations) {
+  $msbuildArgs = @(
+    'YAML_CPP.sln',
+    "/p:Configuration=$cfg",
+    "/p:Platform=$arch",
+    "/p:PlatformType=$arch",
+    '/m',
+    '/v:m'
+  )
+  Start-OsqueryProcess $msbuild $msbuildArgs
+}
 
 # If the build path exists, purge it for a clean packaging
 $chocoDir = Join-Path $(Get-Location) 'osquery-choco'
@@ -80,10 +126,8 @@ if (Test-Path $chocoDir) {
 New-Item -ItemType Directory -Path $chocoDir
 Set-Location $chocoDir
 $includeDir = New-Item -ItemType Directory -Path '.\local\include'
+$libDir = New-Item -ItemType Directory -Path '.\local\lib'
 $srcDir = New-Item -ItemType Directory -Path '.\local\src'
-
-Copy-Item -Recurse "$sourceDir\include\yaml-cpp" $includeDir
-Copy-Item $buildScript $srcDir
 
 Write-NuSpec `
   $packageName `
@@ -94,6 +138,11 @@ Write-NuSpec `
   $packageSourceUrl `
   $copyright `
   $license
+
+Copy-Item "$buildDir\Release\libyaml-cpp*" "$libDir\libyaml-cpp.lib"
+Copy-Item "$buildDir\Debug\libyaml-cpp*" "$libDir\libyaml-cpp_dbg.lib"
+Copy-Item -Recurse "$buildDir\..\include\yaml-cpp" $includeDir
+Copy-Item $buildScript $srcDir
 
 choco pack
 
