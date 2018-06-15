@@ -20,7 +20,7 @@ $authors = 'jbeder'
 $owners = 'jbeder'
 $copyright = 'Copyright (c) 2008-2015 Jesse Beder.'
 $license = 'https://raw.githubusercontent.com/jbeder/yaml-cpp/master/LICENSE'
-$url = "https://github.com/jbeder/yaml-cpp/archive/v$version.zip"
+$url = "https://github.com/jbeder/yaml-cpp/archive/$packageName-$version.zip"
 
 # Invoke our utilities file
 . "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)\osquery_utils.ps1"
@@ -48,6 +48,7 @@ Set-Location $chocoBuildPath
 
 # Retreive the source
 if (-not (Test-Path "$packageName-$version.zip")) {
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
   Invoke-WebRequest $url -OutFile "$packageName-$version.zip"
 }
 
@@ -55,9 +56,18 @@ if (-not (Test-Path "$packageName-$version.zip")) {
 $sourceDir = Join-Path $(Get-Location) "$packageName-$version"
 if (-not (Test-Path $sourceDir)) {
   $7z = (Get-Command '7z').Source
-  $arg = "x $packageName-$version.zip"
+  $arg = "x $packageName-$version.zip -o$packageName-$version"
   Start-Process -FilePath $7z -ArgumentList $arg -NoNewWindow -Wait
 }
+
+# Hacky-hack-hack - the zip package is annoyingly structured.
+$badPath = Join-Path $sourceDir "$packageName-$packageName-$version"
+$badPath = Join-Path $badPath "*"
+Write-Host "Bad path: $badPath"
+$goodPath = "$sourceDir\"
+Write-Host "Good path: $goodPath"
+Move-Item $badPath $goodPath
+
 Set-Location $sourceDir
 
 # If the build path exists, purge it for a clean packaging
