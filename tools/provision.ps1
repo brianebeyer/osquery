@@ -357,8 +357,9 @@ function Install-ThirdParty {
     "rocksdb.5.7.1-r1",
     "thrift-dev.0.11.0",
     "zlib.1.2.8",
-    "rapidjson.1.1.0"
-    "zstd.1.2.0-r3"
+    "rapidjson.1.1.0",
+    "zstd.1.2.0-r3",
+    "yaml-cpp.0.6.2"
   )
   $tmpDir = Join-Path $env:TEMP 'osquery-packages'
   Remove-Item $tmpDir -Recurse -ErrorAction Ignore
@@ -478,25 +479,7 @@ function Main {
   [Environment]::SetEnvironmentVariable("OSQUERY_PYTHON_PATH", $pythonInstall, "Machine")
   $out = Install-PipPackage
   $out = Update-GitSubmodule
-  if (Test-Path env:OSQUERY_BUILD_HOST) {
-    $out = Install-ChocoPackage 'visualcppbuildtools'
-  } else {
-    $deploymentFile = Resolve-Path ([System.IO.Path]::Combine($PSScriptRoot, 'vsdeploy.xml'))
-    $chocoParams = @("--execution-timeout", "7200", "-packageParameters", "--AdminFile ${deploymentFile}")
-    $out = Install-ChocoPackage 'visualstudio2015community' '' ${chocoParams}
 
-    if (Test-RebootPending -eq $true) {
-      Write-Host "[*] Windows requires a reboot to complete installing Visual Studio." -foregroundcolor yellow
-      Write-Host "[*] Please reboot your system and re-run this provisioning script." -foregroundcolor yellow
-      Exit 0
-    }
-
-    if ($PSVersionTable.PSVersion.Major -lt 5 -and $PSVersionTable.PSVersion.Minor -lt 1 ) {
-      Write-Host "[*] Powershell version is < 5.1. Skipping Powershell Linter Installation." -foregroundcolor yellow
-    } else {
-      $out = Install-PowershellLinter
-    }
-  }
   $out = Install-ThirdParty
   Write-Host "[+] Done." -foregroundcolor Yellow
 }

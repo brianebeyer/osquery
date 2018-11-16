@@ -19,6 +19,10 @@ import random
 import sys
 import unittest
 import utils
+import json
+import yaml
+import tempfile
+import glob
 
 # osquery-specific testing utils
 import test_base
@@ -135,6 +139,63 @@ class OsqueryiTest(unittest.TestCase):
         print (proc.stdout)
         print (proc.stderr)
         self.assertEqual(proc.proc.poll(), 0)
+
+    @test_base.flaky
+    def test_config_check_for_yaml(self):
+        '''Test that we can parse a complex YAML file'''
+        proc = test_base.TimeoutRunner([
+                self.binary,
+                "--verbose",
+                "--config_check",
+                "--config_path=%s" % os.path.join(test_base.SCRIPT_DIR, "test_yaml_configs", "single_doc.conf.yaml")
+            ],
+            SHELL_TIMEOUT)
+        self.assertEqual(proc.stdout, "")
+        print (proc.stdout)
+        print (proc.stderr)
+        self.assertEqual(proc.proc.poll(), 0)
+
+    @test_base.flaky
+    def test_config_check_for_all_yamls(self):
+        '''Test that we can parse the all the YAML versions of conf files'''
+
+        json_conf_files_to_test = glob.glob(os.path.join(test_base.SCRIPT_DIR, '*.conf')) + [
+          os.path.join(test_base.SCRIPT_DIR, "..", "deployment", "osquery.example.conf"),
+        ]
+
+        for example_json_path in json_conf_files_to_test:
+            # first verify the config file passes check_config when JSON
+            # because we don't want false positives about YAML errors when it's a bad config
+            proc = test_base.TimeoutRunner([
+                    self.binary,
+                    "--config_check",
+                    "--config_path=%s" % os.path.join(test_base.SCRIPT_DIR, "..", example_json_path)
+                ],
+                SHELL_TIMEOUT)
+            self.assertEqual(proc.stdout, "")
+            print (proc.stdout)
+            print (proc.stderr)
+            self.assertEqual(proc.proc.poll(), 0)
+
+            # then convert the JSON to YAML, write it out as a config file, and test that
+            with tempfile.NamedTemporaryFile() as example_yaml_file:
+              json_without_comments = "".join([line for line in open(example_json_path).readlines()
+                                               if not (line.strip().startswith('//') or line.strip().startswith('#'))])
+              # python's yaml safe_dump does not emit the '---' prefix we use to determine if YAML or not
+              config_as_yaml = "---\n" + yaml.safe_dump(json.loads(json_without_comments), default_flow_style=False)
+              example_yaml_file.write(config_as_yaml)
+              example_yaml_file.flush()
+
+              proc = test_base.TimeoutRunner([
+                      self.binary,
+                      "--config_check",
+                      "--config_path=%s" % os.path.join(test_base.SCRIPT_DIR, "..", example_yaml_file.name)
+                  ],
+                  SHELL_TIMEOUT)
+              self.assertEqual(proc.stdout, "")
+              print (proc.stdout)
+              print (proc.stderr)
+              self.assertEqual(proc.proc.poll(), 0)
 
     def test_meta_commands(self):
         '''Test the supported meta shell/help/info commands'''

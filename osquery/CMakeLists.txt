@@ -138,6 +138,7 @@ if(WINDOWS)
   ADD_OSQUERY_LINK_CORE("ssleay32")
   ADD_OSQUERY_LINK_CORE("eay32")
   ADD_OSQUERY_LINK_CORE("zlibstatic")
+  ADD_OSQUERY_LINK_CORE("yaml-cpp")
 
   # Enable control flow guard
   ADD_OSQUERY_LINK_CORE("-guard:cf")

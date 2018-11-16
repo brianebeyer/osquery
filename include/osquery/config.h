@@ -561,6 +561,8 @@ class ConfigParserPlugin : public Plugin {
  * as it is a single event. But some configuration plugins may update running
  * configurations.
  *
+ * Be warned this will trim ALL leading whitespace from each line.
+ *
  * @param json A mutable input/output string that will contain stripped JSON.
  */
 void stripConfigComments(std::string& json);
